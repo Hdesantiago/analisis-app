@@ -3,31 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Análisis</title>
+  <title>Dashboard Financiero</title>
   <style>
+    /* Estilos Generales */
     body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      background: #f4f6f9;
-      padding: 50px;
-    }
-    h1 {
-      color: #333;
-    }
-    .container {
-      background: white;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f0f2f5;
+      color: #1f1f1f;
+      margin: 0;
       padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      display: inline-block;
     }
-    input {
+
+    /* Estilos para las Pestañas */
+    .tab {
+      overflow: hidden;
+      border-bottom: 1px solid #ccc;
+      background-color: #fff;
+      max-width: 800px;
+      margin: 0 auto;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .tab button {
+      background-color: inherit;
+      float: left;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      padding: 14px 20px;
+      transition: 0.3s;
+      font-size: 17px;
+      font-weight: 500;
+    }
+
+    .tab button:hover {
+      background-color: #ddd;
+    }
+
+    .tab button.active {
+      background-color: #e0e0e0;
+      border-bottom: 2px solid #007bff;
+    }
+
+    .tabcontent {
+      display: none;
+      padding: 20px 12px;
+      border: 1px solid #ccc;
+      border-top: none;
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: #fff;
+      border-radius: 0 0 8px 8px;
+    }
+    
+    /* --- PESTAÑA 1: PORTAFOLIO --- */
+    .stock-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .stock-item:last-child { border-bottom: none; }
+    .stock-info .ticker { font-weight: bold; font-size: 1.1em; }
+    .stock-info .name { font-size: 0.9em; color: #666; }
+    .stock-price { font-size: 1.1em; font-weight: 500; }
+    .stock-change {
+      padding: 5px 10px;
+      border-radius: 5px;
+      color: white;
+      font-weight: bold;
+      min-width: 70px;
+      text-align: center;
+    }
+    .positive { background-color: #26a69a; } /* Verde */
+    .negative { background-color: #ef5350; } /* Rojo */
+
+    /* --- PESTAÑA 2: ANÁLISIS --- */
+    .analisis-container {
+      text-align: center;
+      padding: 20px;
+    }
+    .analisis-container input {
       padding: 10px;
       margin: 10px;
       width: 200px;
       font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
     }
-    button {
+    .analisis-container button {
       padding: 10px 20px;
       margin-top: 10px;
       font-size: 16px;
@@ -37,9 +102,7 @@
       border-radius: 8px;
       cursor: pointer;
     }
-    button:hover {
-      background: #0056b3;
-    }
+    .analisis-container button:hover { background: #0056b3; }
     .resultado {
       margin-top: 20px;
       font-size: 18px;
@@ -50,16 +113,86 @@
 </head>
 <body>
 
-  <h1>Análisis</h1>
-  <div class="container">
-    <input type="number" id="precioActual" placeholder="Precio Actual">
-    <input type="number" id="precioCompra" placeholder="Precio Compra">
-    <br>
-    <button onclick="calcular()">Calcular</button>
-    <div class="resultado" id="resultado"></div>
+  <div class="tab">
+    <button id="defaultOpen" class="tablinks" onclick="openTab(event, 'Portafolio')">📈 Portafolio</button>
+    <button class="tablinks" onclick="openTab(event, 'Analisis')">🧮 Análisis</button>
+  </div>
+
+  <div id="Portafolio" class="tabcontent">
+    <h2>Mi Portafolio</h2>
+    <div id="stock-list">
+      <div class="loading">Cargando datos...</div>
+    </div>
+  </div>
+
+  <div id="Analisis" class="tabcontent">
+    <div class="analisis-container">
+      <h2>Análisis de Rendimiento</h2>
+      <input type="number" id="precioActual" placeholder="Precio Actual">
+      <input type="number" id="precioCompra" placeholder="Precio Compra">
+      <br>
+      <button onclick="calcular()">Calcular</button>
+      <div class="resultado" id="resultado"></div>
+    </div>
   </div>
 
   <script>
+    // --- LÓGICA GENERAL PARA LAS PESTAÑAS ---
+    function openTab(evt, tabName) {
+      // Ocultar todos los contenidos
+      const tabcontent = document.getElementsByClassName("tabcontent");
+      for (let i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+
+      // Quitar la clase "active" de todos los botones
+      const tablinks = document.getElementsByClassName("tablinks");
+      for (let i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+
+      // Mostrar el contenido de la pestaña actual y marcar el botón como activo
+      document.getElementById(tabName).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+    // Abrir la primera pestaña por defecto al cargar la página
+    document.getElementById("defaultOpen").click();
+
+
+    // --- LÓGICA PARA PESTAÑA 1: PORTAFOLIO ---
+    const stockList = document.getElementById('stock-list');
+    async function fetchStocks() {
+      try {
+        const response = await fetch('/api/stocks'); // Llama a nuestro backend
+        const stocks = await response.json();
+        stockList.innerHTML = '';
+        stocks.sort((a, b) => b.changePercent - a.changePercent);
+
+        stocks.forEach(stock => {
+          const changeClass = stock.changePercent >= 0 ? 'positive' : 'negative';
+          const sign = stock.changePercent >= 0 ? '+' : '';
+          const stockElement = document.createElement('div');
+          stockElement.className = 'stock-item';
+          stockElement.innerHTML = `
+            <div class="stock-info">
+              <div class="ticker">${stock.symbol}</div>
+              <div class="name">${stock.symbol}</div>
+            </div>
+            <div class="stock-price">$${stock.price.toFixed(2)}</div>
+            <div class="stock-change ${changeClass}">${sign}${stock.changePercent.toFixed(2)}%</div>
+          `;
+          stockList.appendChild(stockElement);
+        });
+      } catch (error) {
+        stockList.innerHTML = '<div class="error">No se pudieron cargar los datos.</div>';
+        console.error('Error:', error);
+      }
+    }
+    // Cargar los datos del portafolio cuando la página esté lista
+    fetchStocks();
+
+
+    // --- LÓGICA PARA PESTAÑA 2: ANÁLISIS ---
     function calcular() {
       const actual = parseFloat(document.getElementById("precioActual").value);
       const compra = parseFloat(document.getElementById("precioCompra").value);
@@ -69,9 +202,8 @@
         return;
       }
 
-      const porcentaje = (((actual - compra)/compra) )*100;
-      document.getElementById("resultado").innerText =
-        "Resultado: " + porcentaje.toFixed(3) + "%";
+      const porcentaje = ((actual - compra) / compra) * 100;
+      document.getElementById("resultado").innerText = "Resultado: " + porcentaje.toFixed(3) + "%";
     }
   </script>
 
